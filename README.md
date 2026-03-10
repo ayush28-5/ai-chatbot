@@ -26,13 +26,14 @@ The chatbot generates dynamic responses using a pre-trained language model and p
 
 ## Project Structure
 
-ai-chatbot-streamlit
+```
+ai-chatbot-streamlit/
 │
-├── app.py
-├── requirements.txt
-├── README.md
-└── .gitignore
-
+├── app.py              # Main Streamlit chatbot application
+├── requirements.txt    # Project dependencies
+├── README.md           # Project documentation
+└── .gitignore          # Files ignored by Git
+```
 ---
 
 ## How to Run
