@@ -12,6 +12,8 @@ The chatbot generates dynamic responses using a pre-trained language model and p
 * Interactive web interface
 * Chat history support
 * Real-time response generation
+* Conversation memory
+* Reset chat functionality
 
 ---
 
