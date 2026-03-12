@@ -1,70 +1,73 @@
 import streamlit as st
-from transformers import pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
 
 st.set_page_config(page_title="AI Chatbot", page_icon="🤖", layout="wide")
 
 st.title("🤖 AI Chatbot")
 
-# Load model
+# Load model and tokenizer
 @st.cache_resource
 def load_model():
-    return pipeline("text-generation", model="microsoft/DialoGPT-medium")
+    tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-medium")
+    model = AutoModelForCausalLM.from_pretrained("microsoft/DialoGPT-medium")
+    return tokenizer, model
 
-chatbot = load_model()
+tokenizer, model = load_model()
 
-# Initialize session storage
-if "chats" not in st.session_state:
-    st.session_state.chats = {"Chat 1": []}
+# Initialize chat history
+if "chat_history_ids" not in st.session_state:
+    st.session_state.chat_history_ids = None
 
-if "current_chat" not in st.session_state:
-    st.session_state.current_chat = "Chat 1"
-
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
 # Sidebar
 st.sidebar.title("💬 Chats")
 
-chat_names = list(st.session_state.chats.keys())
-
-selected_chat = st.sidebar.selectbox(
-    "Select Chat",
-    chat_names,
-    index=chat_names.index(st.session_state.current_chat)
-)
-
-st.session_state.current_chat = selected_chat
-
-# New chat button
 if st.sidebar.button("➕ New Chat"):
-    new_chat_name = f"Chat {len(chat_names) + 1}"
-    st.session_state.chats[new_chat_name] = []
-    st.session_state.current_chat = new_chat_name
+    st.session_state.messages = []
+    st.session_state.chat_history_ids = None
     st.rerun()
 
-messages = st.session_state.chats[st.session_state.current_chat]
-
 # Display messages
-for message in messages:
+for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Chat input
+# User input
 prompt = st.chat_input("Type your message...")
 
 if prompt:
-    messages.append({"role": "user", "content": prompt})
+
+    st.session_state.messages.append({"role": "user", "content": prompt})
 
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    conversation = ""
-    for msg in messages:
-        conversation += msg["content"] + " "
+    # Encode input
+    new_input_ids = tokenizer.encode(prompt + tokenizer.eos_token, return_tensors='pt')
 
-    response = chatbot(conversation, max_length=120, num_return_sequences=1)
+    # Append chat history
+    if st.session_state.chat_history_ids is not None:
+        bot_input_ids = torch.cat([st.session_state.chat_history_ids, new_input_ids], dim=-1)
+    else:
+        bot_input_ids = new_input_ids
 
-    bot_reply = response[0]["generated_text"].replace(conversation, "").strip()
+    # Generate response
+    st.session_state.chat_history_ids = model.generate(
+        bot_input_ids,
+        max_length=1000,
+        pad_token_id=tokenizer.eos_token_id
+    )
 
-    messages.append({"role": "assistant", "content": bot_reply})
+    # Decode response
+    bot_reply = tokenizer.decode(
+        st.session_state.chat_history_ids[:, bot_input_ids.shape[-1]:][0],
+        skip_special_tokens=True
+    )
 
     with st.chat_message("assistant"):
         st.markdown(bot_reply)
+
+    st.session_state.messages.append({"role": "assistant", "content": bot_reply})
